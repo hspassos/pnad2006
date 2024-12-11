@@ -1,0 +1,32 @@
+---
+title: "Lista 1"
+author: "Henrique de Souza Passos"
+date: "2024-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 1.(a) Carregamento dos dados
+
+```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+df.MergePessDom <- read.csv(""C:/Users/passo/OneDrive/Documentos/Mestrado/Econometria do setor público/Listas/Lista 1/2006/Dados/PES2006.txt"", header=TRUE, sep=",", dec=".")
+```
+
+
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
