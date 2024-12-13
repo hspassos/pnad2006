@@ -9,11 +9,68 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Limpeza do Ambiente
 
-# 1.(a) Carregamento dos dados
+```{r chk0, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+rm(list = ls())
+```
+
+# Carregamento de Pacotes
+
+```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+library(readr) 
+```
+
+# 1 Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
+
+```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+load("~/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/dicPNAD2006supl.rda")
+
+#ajustando o tamanho do número de controle
+dicpes2006supl[3, 3] <- 6
+dicdom2006supl[3, 3] <- 6
+
+
+pessoas <- read.fwf("/home/hspassos/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/PES2006.txt", widths = dicpes2006supl$tamanho, header = FALSE)
+colnames(pessoas) <- dicpes2006supl$cod
+pessoas <- pessoas[, c("UF","V0102","V0103","V0302","V8005","V0402","V0404","V9001","V4703","V4719","V4721","V4723","V4728","V4741")]
+
+domicilios <- read.fwf("/home/hspassos/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/DOM2006.txt", widths = dicdom2006supl$tamanho, header = FALSE)
+colnames(domicilios) <- dicdom2006supl$cod
+domicilios <- domicilios[, c("UF","V0102","V0103","V2403")]
+
+
+```
+
+Outra forma de fazer:
+
+pes <- read.fwf("/home/hspassos/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/PES2006.txt", widths = c(-4, 2, 6, 3, -2, 1, -8, 3, -1, 1, -1, 1, -119, 1, -551, 2, -32, 12, -12, 12, -12, 2, -17, 1, -15, 2 ), header = FALSE)
+names(pes)=c("UF","V0102","V0103","V0302","V8005","V0402","V0404","V9001","V4703","V4719","V4721","V4723","V4728","V4741")
+
+
+# Em seguida junte os bancos de pessoas e domicílios e mantenha somente as observações do estado de Minas Gerais no banco resultante.
 
 ```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-df.MergePessDom <- read.csv(""C:/Users/passo/OneDrive/Documentos/Mestrado/Econometria do setor público/Listas/Lista 1/2006/Dados/PES2006.txt"", header=TRUE, sep=",", dec=".")
+pnad_completa <- merge(pessoas, domicilios, by = c("UF", "V0102","V0103"), all.x = TRUE)
+pnad_completa <- pnad_completa[, !colnames(pnad_completa) %in% "V0101.x"]
+pnad_completa <- pnad_completa[, !colnames(pnad_completa) %in% "V0101.y"]
+
+pnad_completa <- pnad_completa[pnad_completa$UF == 31,]
+
+```
+
+
+# Gerando variáveis
+
+```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+pnad_completa <- pnad_completa[pnad_completa$V2403 !=9,]
+
+#df.MergePessDom2006AAA <- df.MergePessDom2006AAA[df.MergePessDom2006AAA$V2403 == 1,]
+
+pnad_completa <- pnad_completa[pnad_completa$V8005 != 999, ]
+pnad_completa$idade <- pnad_completa$V8005
+
+
 ```
 
 
@@ -21,12 +78,5 @@ df.MergePessDom <- read.csv(""C:/Users/passo/OneDrive/Documentos/Mestrado/Econom
 
 
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
