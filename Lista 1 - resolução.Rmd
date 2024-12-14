@@ -2,7 +2,9 @@
 title: "Lista 1"
 author: "Henrique de Souza Passos"
 date: "2024-12-10"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -18,12 +20,12 @@ rm(list = ls())
 # Carregamento de Pacotes
 
 ```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-library(readr) 
+library(readr)
 ```
 
-# 1 Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
+# 1. Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
 
-```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 load("~/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/dicPNAD2006supl.rda")
 
 #ajustando o tamanho do número de controle
@@ -33,7 +35,7 @@ dicdom2006supl[3, 3] <- 6
 
 pessoas <- read.fwf("/home/hspassos/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/PES2006.txt", widths = dicpes2006supl$tamanho, header = FALSE)
 colnames(pessoas) <- dicpes2006supl$cod
-pessoas <- pessoas[, c("UF","V0102","V0103","V0302","V8005","V0402","V0404","V9001","V4703","V4719","V4721","V4723","V4728","V4741")]
+pessoas <- pessoas[, c("UF","V0102","V0103","V0302","V8005","V0401","V0402","V0404","V9001","V9058","V9101","V9105","V4703","V4719","V4721","V4723","V4728","V4741")]
 
 domicilios <- read.fwf("/home/hspassos/mestrado/infcausal/Listas/Lista 1/pnad2006/Dados/DOM2006.txt", widths = dicdom2006supl$tamanho, header = FALSE)
 colnames(domicilios) <- dicdom2006supl$cod
@@ -50,33 +52,91 @@ names(pes)=c("UF","V0102","V0103","V0302","V8005","V0402","V0404","V9001","V4703
 
 # Em seguida junte os bancos de pessoas e domicílios e mantenha somente as observações do estado de Minas Gerais no banco resultante.
 
-```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk3, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 pnad_completa <- merge(pessoas, domicilios, by = c("UF", "V0102","V0103"), all.x = TRUE)
-pnad_completa <- pnad_completa[, !colnames(pnad_completa) %in% "V0101.x"]
-pnad_completa <- pnad_completa[, !colnames(pnad_completa) %in% "V0101.y"]
 
 pnad_completa <- pnad_completa[pnad_completa$UF == 31,]
 
 ```
 
 
-# Gerando variáveis
+# Gerando as variáveis
 
-```{r chk2, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-pnad_completa <- pnad_completa[pnad_completa$V2403 !=9,]
+```{r chk4, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+pnad_completa <- subset(pnad_completa, V2403 !=9)
+pnad_completa$bolsa_familia <- ifelse(pnad_completa$V2403 == 1, 1, 0)
 
-#df.MergePessDom2006AAA <- df.MergePessDom2006AAA[df.MergePessDom2006AAA$V2403 == 1,]
 
-pnad_completa <- pnad_completa[pnad_completa$V8005 != 999, ]
+pnad_completa <- subset(pnad_completa, V8005 != 999)
 pnad_completa$idade <- pnad_completa$V8005
 
+
+pnad_completa$idade_quadrado <- pnad_completa$idade^2
+
+
+pnad_completa <- subset(pnad_completa, V4703 != 17)
+pnad_completa$escolaridade <- pnad_completa$V4703 - 1
+
+
+pnad_completa$escolaridade_quadrado <- pnad_completa$escolaridade^2
+
+
+pnad_completa$sexo <- ifelse(pnad_completa$V0302 == 2, 1, 0)
+
+
+pnad_completa$negro_pardo <- ifelse(pnad_completa$V0404 == 4 | pnad_completa$V0404 == 8, 1, 0)
+
+
+pnad_completa$casado <- ifelse(pnad_completa$V4723 <= 5 , 1, 0)
+
+
+pnad_completa$horas_trabalho <- pnad_completa$V9058 + ifelse(is.na(pnad_completa$V9101), 0, pnad_completa$V9101) + ifelse(is.na(pnad_completa$V9105), 0, pnad_completa$V9105)
+
+
+pnad_completa <- subset(pnad_completa, V9001 != 1 | V9001 != 3)
+pnad_completa$particip_mercado_trabalho <- ifelse(pnad_completa$V9001 == 1, 1, 0)
+
+
+pnad_completa$rural <- ifelse(pnad_completa$V4728 <= 3, 0, 1)
+
+
+pnad_completa <- subset(pnad_completa, V4719 != "999 999 999 999")
+pnad_completa <- subset(pnad_completa, V4721 != "999 999 999 999")
+pnad_completa <- subset(pnad_completa, V4741 != "999 999 999 999")
+pnad_completa$renda_lchefepc <- (pnad_completa$V4721 - pnad_completa$V4719) / pnad_completa$V4741
+```
+
+
+```{r chk5, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+filhos_menos_14 <- aggregate(
+  V0402 ~ V0102 + V0103, 
+  data = pnad_completa[pnad_completa$V0402 == 3 & pnad_completa$V8005 < 14, ], 
+  FUN = length
+)
+colnames(filhos_menos_14) <- c("V0102", "V0103", "filhos_menos_14")
+
+filhos_mais_14 <- aggregate(
+  V0402 ~ V0102 + V0103, 
+  data = pnad_completa[pnad_completa$V0402 == 3 & pnad_completa$V8005 >= 14, ], 
+  FUN = length
+)
+colnames(filhos_mais_14) <- c("V0102", "V0103", "filhos_mais_14")
+
+pnad_completa <- merge(pnad_completa, filhos_menos_14, by = c("V0102","V0103"), all.x = TRUE)
+pnad_completa <- merge(pnad_completa, filhos_mais_14, by = c("V0102","V0103"), all.x = TRUE)
+
+
+pnad_completa <- subset(pnad_completa, V0401 == 1 | V0401 == 2)
 
 ```
 
 
+# 2. Estimando o modelo
 
 
-
+```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+reg.eq.short.masc <- lm(eq.short.masc, data = df.MergePessDomOcup)
+```
 
 
 
