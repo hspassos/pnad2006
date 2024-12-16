@@ -21,9 +21,6 @@ rm(list = ls())
 
 ```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 library(readr)
-library(lmtest)  # Para testar a significância estatística
-library(sandwich) # Para a matriz robusta de heterocedasticidade
-library(plm) # Para análise com dados m painel 
 ```
 
 # 1. Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
@@ -67,7 +64,7 @@ pnad_completa <- pnad_completa[pnad_completa$UF == 31,]
 
 ```{r chk4, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 pnad_completa <- subset(pnad_completa, V2403 !=9)
-pnad_completa$PBF <- ifelse(pnad_completa$V2403 == 1, 1, 0)
+pnad_completa$bolsa_familia <- ifelse(pnad_completa$V2403 == 1, 1, 0)
 
 
 pnad_completa <- subset(pnad_completa, V8005 != 999)
@@ -138,75 +135,8 @@ pnad_completa <- subset(pnad_completa, V0401 == 1 | V0401 == 2)
 
 
 ```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-eq.horas_trabalho <- horas_trabalho ~ PBF + idade + idade_quadrado + escolaridade + escolaridade_quadrado + sexo + negro_pardo + casado + rural + renda_lchefepc
-
-reg.eq.horas_trabalho <- lm(eq.horas_trabalho, data = pnad_completa)
-
-summary((reg.eq.horas_trabalho))
-screenreg(reg.eq.horas_trabalho, digits = 4, custom.model.names = c("eq 1"))
+reg.eq.short.masc <- lm(eq.short.masc, data = df.MergePessDomOcup)
 ```
-
-2.a. O coeficiente da variável de tratamento é $\beta_1 = -1.8775$, esse valor indica que uma pessoa que recebe o bolsa-família (variável de tratamento) tem uma tendência a trabalhar menos horas. Como esse grupo tem essa fonte de renda sem precisar trabalhar, o custo de oportunidade do trabalho sobe, fazendo que essas pessoas aceitem apenas trabalhos que excedam esse custo de oportunidade mais alto.
-
-
-2.b. Teste de heteroscedasticidade
-```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-# Teste de White (com termos quadráticos)
-bptest(reg.eq.horas_trabalho, ~ horas_trabalho + PBF + idade + idade_quadrado + escolaridade + escolaridade_quadrado + sexo + negro_pardo + casado + rural + renda_lchefepc, data = pnad_completa)
-```
-
-Como o p-valor do teste foi muito baixo, podemos dizer que há Heteroscedasticidade
-
-2.c. Matriz robusta de White
-
-```{r chk8, echo=TRUE, warning=TRUE, paged.print=TRUE}
-white_vcov <- vcovHC(reg.eq.horas_trabalho, type = "HC")
-print(white_vcov)
-
-coeftest_robust <- coeftest(reg.eq.horas_trabalho, vcov = white_vcov)
-print(coeftest_robust)
-```
-
-Os erros padrão aumentaram e os valores de t diminuíram, mostrando estimativas mais conservadoras e menos precisas. Isso acontece para tentar corrigir parte do problema de heteroscedasticidade. 
-
-Os p-valores continuam muito baixos com exceção da renda_lchefepc (renda domiciliar per capita não proveniente do trabalho do chefe do domicílio) que aumentou significativamente de 0.454841 para 0.505682. Esse p-valor indiqua que, a renda de trabalho dos outros moradores do domicílio não tem impacto significativo na quantidade de horas trabalhadas. 
-
-
-2.d. Matriz robusta à heteroscedasticidade e intra-cluster correlation
-
-```{r chk9, echo=TRUE, warning=TRUE, paged.print=TRUE}
-vcov_robusto_cluster <- vcovCL(reg.eq.horas_trabalho, cluster = ~V0102)
-
-coeftest(reg.eq.horas_trabalho, vcov = vcov_robusto_cluster)
-
-```
-
-A variável mais afetada foi rural, que teve um aumento significativo do erro padrão. Isso mostra que a quantidade de horas trabalhadas em regiões rurais esão fortemente correlacionadas. Tambẽm houve uma mudança grande na variável sexo que mostra que homens passam mais tempo fazendo trabalho remunerado.
-
-
-2,e. Qual o problema de usarmos somente indivíduos com um número de horas trabalhadas maior do que zero na regressão. Que hipóteses seriam necessárias para que o efeito estimado refletisse o verdadeiro efeito do programa?
-
-Quando medimos o coeficiete do efeito de tratamento PBF, queremos saber qual o impacto do bolsa-família nas horas trabalhadas. Mas muitas pessoas podem sair do trabalho remunerado devido ao auxílio aumentar seu custo de oportunidade. Assim, quando consideramos apenas as pessoas que trabalham, estamos analisando o impacto apenas em parte da força de trabalho. Quando usamos a intra-cluster correlation, vimos a diferença no cdo erro padrão da variável sexo, mostrando que homens trabalham mais, mas isso desconsidera as horas de trabalho doméstico não remunerado.
-
-
-
-# 3. 
-
-```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-lowbrth <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/LOWBRTH.DTA")
-
-eq.lowbrthit <- lowbrth ~ d90 + afdcprc + lphypc + lbedspc + lpcinc + lpopul
-reg.eq.lowbrthit <- lm(eq.lowbrthit, data = lowbrth)
-
-summary(reg.eq.lowbrthit)
-screenreg(reg.eq.lowbrthit, digits = 4, custom.model.names = c("eq 2"))
-
-#reg.eq.horas_trabalho <- lm(eq.horas_trabalho, data = pnad_completa, na.action = na.omit)
-
-#summary((reg.eq.horas_trabalho))
-#screenreg(reg.eq.horas_trabalho, digits = 4, custom.model.names = c("eq 1"))
-```
-
 
 
 
