@@ -21,9 +21,12 @@ rm(list = ls())
 
 ```{r chk1, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 library(readr)
+library(haven)
+library(texreg)
 library(lmtest)  # Para testar a significância estatística
 library(sandwich) # Para a matriz robusta de heterocedasticidade
 library(plm) # Para análise com dados m painel 
+library(dplyr)
 ```
 
 # 1. Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
@@ -192,20 +195,83 @@ Quando medimos o coeficiete do efeito de tratamento PBF, queremos saber qual o i
 
 # 3. 
 
+
+3.a. Espera-se que quando mais pessoas são atendidas pelo programa AFDC, a quantidade de nascimentos de baixo peso seja menor, portanto o coeficiente da variável $afdcprc$ seja negativo. O mesmo vale para as outras variáveis de qualidade de saúde e de níveis de renda, quanto melhores esses indicadores, menos nascimentos de baixo peso. Ou seja, é esperado que teremos os respectivos coeficientes $\beta_j<0$. A exceção é a variável $popul$ que pode ter coeficiente positivo ou negativo, uma população maior não necessariamente levaria a uma aumento na variável dependente.
+
+
 ```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 lowbrth <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/LOWBRTH.DTA")
+lowbrth <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul")]
 
 eq.lowbrthit <- lowbrth ~ d90 + afdcprc + lphypc + lbedspc + lpcinc + lpopul
-reg.eq.lowbrthit <- lm(eq.lowbrthit, data = lowbrth)
+reg.eq.lowbrthit <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "pooling", na.action = na.exclude)
+robust_se <- vcovHC(reg.eq.lowbrthit, method = "arellano", type = "HC1")
 
 summary(reg.eq.lowbrthit)
 screenreg(reg.eq.lowbrthit, digits = 4, custom.model.names = c("eq 2"))
 
-#reg.eq.horas_trabalho <- lm(eq.horas_trabalho, data = pnad_completa, na.action = na.omit)
-
-#summary((reg.eq.horas_trabalho))
-#screenreg(reg.eq.horas_trabalho, digits = 4, custom.model.names = c("eq 1"))
+coeftest(reg.eq.lowbrthit, vcov = robust_se)
 ```
+
+3.b. O único coeficiente que teve um resultado conforme o esperado foi para a variável de renda, mostrando que lugares com níveis de renda mais elevados têm menos nascimentos de risco. Quanto às outras variáveis, pode ter acontecido que elas tenham forte relação entre si, principalmente com a renda. Lugares que têm maiores níveis de renda também têm uma chance maior de ter mais médicos e leitos de hospitais per capita. A variável $afdcprc$ também pode ter um problema que lugares que já tenham poucos nascimentos de risco, precisariam menos de assitência do programa e por isso o programa atende mais pessoas em lugares que tenham $lowbrthit$ mais elevados, o que explicaria o coeficiente positivo.
+
+
+3.c. 
+
+```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+is.pbalanced(lowbrth, index = c("stateabb", "year"))
+
+reg.eq.lowbrthit.fe <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "within", na.action = na.exclude)
+
+summary(reg.eq.lowbrthit.fe)
+screenreg(reg.eq.lowbrthit.fe, digits = 4, custom.model.names = c("eq 3"))
+```
+
+
+Fazendo a comparação entre o modelo POLS e por Efeitos Fixos, parece que o método de Efeitos Fixos é mas consistente, para $\beta_1$ e $\beta_2$ o p-valor passou a ser significativo (o que não acontecia usando POLS). Além disso os coeficientes que se esperava que fossem negativos agora são, com excessão de médicos per capita que pode estar sendo afetado por efeitosnão observados.
+
+
+3.d.
+
+```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+#lowbrth_diff <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul")]
+#lowbrth_diff <- pdata.frame(lowbrth_diff, index = c("stateabb", "year"))
+
+data_d90_0 <- filter(lowbrth, d90 == 0)
+data_d90_1 <- filter(lowbrth, d90 == 1)
+
+lowbrth_diff <- data.frame(
+  lowbrth = c(data_d90_1$lowbrth - data_d90_0$lowbrth),
+  afdcprc = c(data_d90_1$afdcprc - data_d90_0$afdcprc),
+  lphypc = c(data_d90_1$lphypc - data_d90_0$lphypc),
+  lbedspc = c(data_d90_1$lbedspc - data_d90_0$lbedspc),
+  lpcinc = c(data_d90_1$lpcinc - data_d90_0$lpcinc),
+  lpopul = c(data_d90_1$lpopul - data_d90_0$lpopul)
+)
+
+reg.diff <- lm(lowbrth ~ afdcprc + lphypc + lbedspc + lpcinc + lpopul, data = lowbrth_diff)
+
+summary(reg.diff)
+```
+
+
+Os coeficientes são iguais pois os efeitos fixos $c_i$ são eliminados de formas equivalentes.
+
+3.e. 
+
+```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+reg.eq.lowbrthit_random <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "random", na.action = na.exclude)
+
+summary(reg.eq.lowbrthit_random)
+
+phtest(reg.eq.lowbrthit.fe, reg.eq.lowbrthit_random)
+```
+
+
+
+
+
+
 
 
 
