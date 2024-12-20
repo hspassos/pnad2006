@@ -27,6 +27,8 @@ library(lmtest)  # Para testar a significância estatística
 library(sandwich) # Para a matriz robusta de heterocedasticidade
 library(plm) # Para análise com dados m painel 
 library(dplyr)
+library(AER)
+library(ivmodel)
 ```
 
 # 1. Extraindo o banco de dados da PNAD dos arquivos “PES2006.txt” e “DOM2006.txt” e organizando como os dicionários.
@@ -201,7 +203,7 @@ Quando medimos o coeficiete do efeito de tratamento PBF, queremos saber qual o i
 
 ```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 lowbrth <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/LOWBRTH.DTA")
-lowbrth <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul")]
+lowbrth <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul", "afdcpsq")]
 
 eq.lowbrthit <- lowbrth ~ d90 + afdcprc + lphypc + lbedspc + lpcinc + lpopul
 reg.eq.lowbrthit <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "pooling", na.action = na.exclude)
@@ -216,7 +218,7 @@ coeftest(reg.eq.lowbrthit, vcov = robust_se)
 3.b. O único coeficiente que teve um resultado conforme o esperado foi para a variável de renda, mostrando que lugares com níveis de renda mais elevados têm menos nascimentos de risco. Quanto às outras variáveis, pode ter acontecido que elas tenham forte relação entre si, principalmente com a renda. Lugares que têm maiores níveis de renda também têm uma chance maior de ter mais médicos e leitos de hospitais per capita. A variável $afdcprc$ também pode ter um problema que lugares que já tenham poucos nascimentos de risco, precisariam menos de assitência do programa e por isso o programa atende mais pessoas em lugares que tenham $lowbrthit$ mais elevados, o que explicaria o coeficiente positivo.
 
 
-3.c. 
+3.c. Estimando os efeitos fixos.
 
 ```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 is.pbalanced(lowbrth, index = c("stateabb", "year"))
@@ -233,7 +235,7 @@ Fazendo a comparação entre o modelo POLS e por Efeitos Fixos, parece que o mé
 
 3.d.
 
-```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk8, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 #lowbrth_diff <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul")]
 #lowbrth_diff <- pdata.frame(lowbrth_diff, index = c("stateabb", "year"))
 
@@ -246,7 +248,8 @@ lowbrth_diff <- data.frame(
   lphypc = c(data_d90_1$lphypc - data_d90_0$lphypc),
   lbedspc = c(data_d90_1$lbedspc - data_d90_0$lbedspc),
   lpcinc = c(data_d90_1$lpcinc - data_d90_0$lpcinc),
-  lpopul = c(data_d90_1$lpopul - data_d90_0$lpopul)
+  lpopul = c(data_d90_1$lpopul - data_d90_0$lpopul),
+  afdcpsq = c(data_d90_1$afdcpsq - data_d90_0$afdcpsq)
 )
 
 reg.diff <- lm(lowbrth ~ afdcprc + lphypc + lbedspc + lpcinc + lpopul, data = lowbrth_diff)
@@ -259,13 +262,100 @@ Os coeficientes são iguais pois os efeitos fixos $c_i$ são eliminados de forma
 
 3.e. 
 
-```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk9, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 reg.eq.lowbrthit_random <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "random", na.action = na.exclude)
 
 summary(reg.eq.lowbrthit_random)
 
 phtest(reg.eq.lowbrthit.fe, reg.eq.lowbrthit_random)
 ```
+
+O p-valor foi menor que $0.05$, isso indica que os efeitos individuais estão correlacionados com as variáveis explicativas. Portanto, o modelo de efeitos aleatórios é inconsistente e o modelo de efeitos fixos é mais adequado.
+
+3.f. 
+
+
+```{r chk10, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+eq.lowbrthit2 <- lowbrth ~ d90 + afdcprc + afdcpsq + lphypc + lbedspc + lpcinc + lpopul
+reg.eq.lowbrthit2 <- plm(eq.lowbrthit2, data = lowbrth, index = c("stateabb", "year"), model = "pooling", na.action = na.exclude)
+
+summary(reg.eq.lowbrthit2)
+
+beta_1 <- coef(reg.eq.lowbrthit2)["afdcprc"]
+beta_2 <- coef(reg.eq.lowbrthit2)["afdcpsq"]
+max_point <- -beta_1 / (2 * beta_2)
+max_point
+
+```
+
+O p-valor de $0.941$ indica que essa estimativa não é estatísticamente significativa. Adicionando $apdcprc² = afdcpsq$ os coeficientes continuaram muito baixos, não tendo grandes alteraćões. O ponto de inflexão ocorre quando $afdcprc = 1.152$.
+
+#4.
+
+4.a. Provavelmente existem fatores não observados relacionados ao estilo de vida da mãe ou questões socieconômicas. Mães que fumam durante a gravidez possivelmente têm menor adesão a cudados pré-natais e menos acesso a orientações médicas, o que tambẽm deve ter uma relação com renda mais baixa.
+
+4.b. Um bom instrumento precisa ser correlacionado com a variável endógena ($packs_i$) e não pode ser correlacionado com o termo de erro. O preço médio do cigarro está relacionado ao consumo, portanto o instrumento é relevante. Quanto a exogeneidade, o preço do cigarro pode capturar diferenças econômicas entre estados que também afetam o peso do bebê. Estados com maior custo de vida (e preços mais altos) podem ter famílias com maior renda, o que pode influenciar tanto o consumo de cigarros quanto o peso do bebê, isso pode ser uma causa de exogeneidade que poderia ser analisada comparando os dados de preços de cigarros com renda, caso haja correlação significativa, o instrumento poderia ser viesado.
+
+4.c.
+
+```{r chk11, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+bwght <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/BWGHT.DTA")
+
+#ols
+reg.bwght <- lm(bwght ~ male + parity + lfaminc + packs, data = bwght)
+summary(reg.bwght)
+
+#2sls
+
+eq.1.estagio <- lm(packs ~ cigprice, data = bwght)
+summary(eq.1.estagio)
+packs_pred <- predict(eq.1.estagio)
+
+reg.bwght.2sls <- lm(bwght ~ male + parity + lfaminc + packs_pred, data = bwght)
+summary(reg.bwght.2sls)
+
+
+first_stage <- lm(packs ~ male + parity + lfaminc + cigprice, data = bwght)
+summary(first_stage)
+
+iv_test <- ivmodel(Y = as.numeric(bwght$bwght),
+                   D = as.numeric(bwght$packs),
+                   Z = as.numeric(bwght$cigprice),
+                   X = model.matrix(~ male + parity + lfaminc, data = bwght)[,-1])
+
+summary(iv_test)
+```
+
+Os resultados foram bastante diferentes entre os modelos e os resultados mostram uma estatística F de $1.0018$ que mostra que o instrumento é fraco. O preço do cigarro não parece ter um efeito significativo sobre o número de maços consumidos durante a gravidez.
+
+
+4.d.
+
+
+```{r chk12, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+re.bwght.cig <- lm(bwght ~ cigprice, data = bwght)
+summary(re.bwght.cig)
+
+```
+
+A variável $cigprice$ tem $p-valor = 0.067$, isso sugere uma significância fraca e pode ter um problema de endogeneidade, inseri-la no modelo poderia criar um viés por ser potencialmente correlacionada com os erros.
+
+
+#5.
+
+
+```{r chk11, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+bwght <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/pums80.DTA")
+
+
+```
+
+
+
+
+
+
+
 
 
 
