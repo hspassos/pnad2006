@@ -3,9 +3,9 @@ title: "Lista 1"
 author: "Henrique de Souza Passos"
 date: "2024-12-10"
 output:
-  pdf_document: default
-  html_document: default
+  pdf_document: html_document
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -201,7 +201,7 @@ Quando medimos o coeficiete do efeito de tratamento PBF, queremos saber qual o i
 3.a. Espera-se que quando mais pessoas são atendidas pelo programa AFDC, a quantidade de nascimentos de baixo peso seja menor, portanto o coeficiente da variável $afdcprc$ seja negativo. O mesmo vale para as outras variáveis de qualidade de saúde e de níveis de renda, quanto melhores esses indicadores, menos nascimentos de baixo peso. Ou seja, é esperado que teremos os respectivos coeficientes $\beta_j<0$. A exceção é a variável $popul$ que pode ter coeficiente positivo ou negativo, uma população maior não necessariamente levaria a uma aumento na variável dependente.
 
 
-```{r chk6, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk10, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 lowbrth <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/LOWBRTH.DTA")
 lowbrth <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul", "afdcpsq")]
 
@@ -220,7 +220,7 @@ coeftest(reg.eq.lowbrthit, vcov = robust_se)
 
 3.c. Estimando os efeitos fixos.
 
-```{r chk7, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk11, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 is.pbalanced(lowbrth, index = c("stateabb", "year"))
 
 reg.eq.lowbrthit.fe <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "within", na.action = na.exclude)
@@ -235,7 +235,7 @@ Fazendo a comparação entre o modelo POLS e por Efeitos Fixos, parece que o mé
 
 3.d.
 
-```{r chk8, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk12, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 #lowbrth_diff <- lowbrth[, c("stateabb", "year", "lowbrth", "d90", "afdcprc", "lphypc", "lbedspc", "lpcinc", "lpopul")]
 #lowbrth_diff <- pdata.frame(lowbrth_diff, index = c("stateabb", "year"))
 
@@ -262,7 +262,7 @@ Os coeficientes são iguais pois os efeitos fixos $c_i$ são eliminados de forma
 
 3.e. 
 
-```{r chk9, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk13, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 reg.eq.lowbrthit_random <- plm(eq.lowbrthit, data = lowbrth, index = c("stateabb", "year"), model = "random", na.action = na.exclude)
 
 summary(reg.eq.lowbrthit_random)
@@ -275,7 +275,7 @@ O p-valor foi menor que $0.05$, isso indica que os efeitos individuais estão co
 3.f. 
 
 
-```{r chk10, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk14, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 eq.lowbrthit2 <- lowbrth ~ d90 + afdcprc + afdcpsq + lphypc + lbedspc + lpcinc + lpopul
 reg.eq.lowbrthit2 <- plm(eq.lowbrthit2, data = lowbrth, index = c("stateabb", "year"), model = "pooling", na.action = na.exclude)
 
@@ -290,7 +290,7 @@ max_point
 
 O p-valor de $0.941$ indica que essa estimativa não é estatísticamente significativa. Adicionando $apdcprc² = afdcpsq$ os coeficientes continuaram muito baixos, não tendo grandes alteraćões. O ponto de inflexão ocorre quando $afdcprc = 1.152$.
 
-#4.
+# 4.
 
 4.a. Provavelmente existem fatores não observados relacionados ao estilo de vida da mãe ou questões socieconômicas. Mães que fumam durante a gravidez possivelmente têm menor adesão a cudados pré-natais e menos acesso a orientações médicas, o que tambẽm deve ter uma relação com renda mais baixa.
 
@@ -298,7 +298,7 @@ O p-valor de $0.941$ indica que essa estimativa não é estatísticamente signif
 
 4.c.
 
-```{r chk11, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk15, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 bwght <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/BWGHT.DTA")
 
 #ols
@@ -332,7 +332,7 @@ Os resultados foram bastante diferentes entre os modelos e os resultados mostram
 4.d.
 
 
-```{r chk12, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+```{r chk16, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
 re.bwght.cig <- lm(bwght ~ cigprice, data = bwght)
 summary(re.bwght.cig)
 
@@ -341,12 +341,31 @@ summary(re.bwght.cig)
 A variável $cigprice$ tem $p-valor = 0.067$, isso sugere uma significância fraca e pode ter um problema de endogeneidade, inseri-la no modelo poderia criar um viés por ser potencialmente correlacionada com os erros.
 
 
-#5.
+# 5.
+
+O efeito de tratamento estimado aqui é o efeito causal de ter mais de dois filhos ($morekids$) sobre três desfechos: Probabilidade de trabalhar para pagamento em 1979 ($workedm$), Horas de trabalho semanais em 1979 ($hourswm$), Rendimento de trabalho semanal em 1979 ($incomem$).
+
+O que estamos estimado é um efeito causal médio local (LATE) para as mães influenciadas pelos instrumentos. A significância estatística ausente sugere que, na média, o impacto de ter mais de dois filhos sobre os desfechos econômicos e de trabalho é muito pequeno ou não significativo.
 
 
-```{r chk11, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
-bwght <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/pums80.DTA")
+```{r chk17, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+pums80 <- read_dta("~/mestrado/infcausal/Listas/Lista 1/pnad2006/pums80.dta")
 
+morekids_pred <- lm(morekids ~ boy1st + boy2nd + samesex + multi2nd, data = pums80)
+summary(morekids_pred)
+
+model_workedm <- ivreg(workedm ~ morekids + agem1 + agefstm + black + hispan + othrace |
+                      boy1st + boy2nd + samesex + multi2nd, data = pums80)
+
+model_hourswm <- ivreg(hourswm ~ morekids + agem1 + agefstm + black + hispan + othrace |
+                       boy1st + boy2nd + samesex + multi2nd, data = pums80)
+
+model_incomem <- ivreg(incomem ~ morekids + agem1 + agefstm + black + hispan + othrace |
+                       boy1st + boy2nd + samesex + multi2nd, data = pums80)
+
+summary(model_workedm)
+summary(model_hourswm)
+summary(model_incomem)
 
 ```
 
